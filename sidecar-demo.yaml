@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidecar-demo
+spec:
+  selector:
+    matchLabels:
+      name: sidecar-demo
+  template:
+    metadata:
+      labels:
+        name: sidecar-demo
+    spec:
+      containers:
+      - image: busybox
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo '<h4>Hi I am from Sidecar container 1</h4>' >> /var/log/index.html; sleep 5;done"]
+        name: sidecar-container1
+        resources: {}
+        volumeMounts:
+          - name: var-logs
+            mountPath: /var/log
+      - image: busybox
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo '<h4>Hi I am from Sidecar container 2</h4>' >> /var/log/index.html; sleep 120;done"]
+        name: sidecar-container2
+        resources: {}
+        volumeMounts:
+          - name: var-logs
+            mountPath: /var/log
+      - image: nginx
+        name: main-container
+        resources: {}
+        ports:
+          - containerPort: 80
+        volumeMounts:
+          - name: var-logs
+            mountPath: /usr/share/nginx/html
+      volumes:
+      - name: var-logs
+        emptyDir: {}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidecardemo
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    name: sidecar-demo
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sidecar-demo
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  rules:
+  - host: thanhnt.elixir.vn
+    http:
+      paths:
+      - path: /sidecar/?(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: sidecardemo
+            port:
+              number: 80

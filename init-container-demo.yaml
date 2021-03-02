@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: init-container-demo
+spec:
+  # replicas: 5
+  selector:
+    matchLabels:
+      name: init-container-demo
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        name: init-container-demo
+    spec:
+      initContainers:
+      - name: init-container
+        image: busybox
+        command: ["/bin/sh"]
+        args: ["-c", "echo '<html><h1>Hi I am from init container</h1><html>'> /site/index.html"]
+        volumeMounts:
+        - name: workdir
+          mountPath: /site
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: workdir
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: workdir
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: init-container-demo
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    name: init-container-demo
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: init-container-demo
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+  namespace: default
+spec:
+  rules:
+  - host: thanhnt.elixir.vn
+    http:
+      paths:
+      - path: /initcontainer/?(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: init-container-demo
+            port:
+              number: 80
